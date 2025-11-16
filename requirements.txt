@@ -6,3 +6,4 @@ python-dotenv
 torch
 flask
 flask-cors
+gunicorn
