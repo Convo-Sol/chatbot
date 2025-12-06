@@ -39,23 +39,23 @@ def get_query_embedding(query):
                 raise RuntimeError(f"Embedding API failed: {e}")
 
 def retrieve_top_k(query, top_k=TOP_K):
-    "."""
-tsurn resulet 
-    r   t(idx)]))
-ks[ine), chun(scorfloatts.append((      resul):
-      chunksd idx < len( -1 andx !=        if i], I[0]):
-zip(D[0 in dxre, i
-    for sco[]ults =  ress
-    with scorekschunop n t Retur 
-    #    top_k)
-c, axis=0),ms(query_vep.expand_di(nx.searchindeI = ex
-    D, in Faiss indSearch   
-    #   = norm
-vec /    query_m > 0:
-        if norquery_vec)
-orm(np.linalg.n   norm = oat32)
- p.fl=ndtypembedding, .array(enp_vec = 
-    queryct searchoduor inner-prnormalize for and re vect Prepa 
-    #
-   g(query)eddiny_embet_quering = g  embeddmini
-  ing from Ge embeddet query  # G   searchs and Faissi embeddingng Geminusiery he qulevant to ts retop-k chunk"Get "
+    """Get the query embedding using Gemini and retrieve top-k chunks relevant to the query using Faiss search."""
+    # Get query embedding from Gemini
+    embedding = get_query_embedding(query)
+    
+    # Prepare query vector and normalize for inner-product search
+    query_vec = np.array(embedding, dtype=np.float32)
+    norm = np.linalg.norm(query_vec)
+    if norm > 0:
+        query_vec = query_vec / norm
+    
+    # Search in Faiss index
+    D, I = index.search(np.expand_dims(query_vec, axis=0), top_k)
+    
+    # Return top chunks with scores
+    results = []
+    for score, idx in zip(D[0], I[0]):
+        if idx != -1 and idx < len(chunks):
+            results.append((float(score), chunks[idx]))
+    
+    return results
