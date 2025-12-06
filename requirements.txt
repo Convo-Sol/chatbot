@@ -7,3 +7,4 @@ torch
 flask
 flask-cors
 gunicorn
+faiss-cpu
