@@ -1,41 +1,61 @@
-# retrieval.py
+# retrieval.py - Query Embedding & Search
+# Uses Faiss index (memory-mapped) and Gemini API for query embeddings
+import faiss
 import numpy as np
-from utils import load_db, save_db
-from config import DB_PATH, TOP_K
+import pickle
+import time
+from google import genai
+from config import TOP_K
 
-def cosine_similarity(a, b):
-    a = np.array(a, dtype=np.float32)
-    b = np.array(b, dtype=np.float32)
-    if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
-        return 0.0
-    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+# Initialize Google GenAI client
+client = genai.Client()
 
-class InMemoryVectorStore:
-    """
-    DB is a list of dicts:
-    {
-        "id": str,
-        "filename": str,
-        "chunk_index": int,
-        "text": str,
-        "embedding": list[float]
-    }
-    """
-    def __init__(self, db_path=DB_PATH):
-        self.db_path = db_path
-        self.docs = load_db(db_path)
+# Load Faiss index (memory-mapped to avoid loading all data into RAM)
+try:
+    index = faiss.read_index('db/index.faiss', faiss.IO_FLAG_MMAP)
+except Exception:
+    index = faiss.read_index('db/index.faiss')
 
-    def add(self, record):
-        self.docs.append(record)
+# Load chunk metadata
+with open('db/chunks.pkl', 'rb') as f:
+    chunks = pickle.load(f)
 
-    def persist(self):
-        save_db(self.docs, self.db_path)
+def get_query_embedding(query):
+    """Get query embedding from Gemini API with retry logic."""
+    for attempt in range(3):
+        try:
+            result = client.models.embed_content(
+                model="models/text-embedding-004",
+                content=query
+            )
+            # Extract embedding values
+            if hasattr(result, 'embedding'):
+                return result.embedding.values
+            return result['embedding']
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(1)
+            else:
+                raise RuntimeError(f"Embedding API failed: {e}")
 
-    def search(self, query_embedding, top_k=TOP_K):
-        # compute cosine for each doc
-        scored = []
-        for doc in self.docs:
-            score = cosine_similarity(query_embedding, doc["embedding"])
-            scored.append((score, doc))
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return scored[:top_k]
+def retrieve_top_k(query, top_k=TOP_K):
+    "."""
+tsurn resulet 
+    r   t(idx)]))
+ks[ine), chun(scorfloatts.append((      resul):
+      chunksd idx < len( -1 andx !=        if i], I[0]):
+zip(D[0 in dxre, i
+    for sco[]ults =  ress
+    with scorekschunop n t Retur 
+    #    top_k)
+c, axis=0),ms(query_vep.expand_di(nx.searchindeI = ex
+    D, in Faiss indSearch   
+    #   = norm
+vec /    query_m > 0:
+        if norquery_vec)
+orm(np.linalg.n   norm = oat32)
+ p.fl=ndtypembedding, .array(enp_vec = 
+    queryct searchoduor inner-prnormalize for and re vect Prepa 
+    #
+   g(query)eddiny_embet_quering = g  embeddmini
+  ing from Ge embeddet query  # G   searchs and Faissi embeddingng Geminusiery he qulevant to ts retop-k chunk"Get "
