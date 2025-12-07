@@ -7,9 +7,8 @@ import time
 import google.generativeai as genai
 from config import TOP_K, GEMINI_API_KEY
 
-# Configure and initialize Google GenAI client
+# Configure Google GenAI
 genai.configure(api_key=GEMINI_API_KEY)
-client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Load Faiss index (memory-mapped to avoid loading all data into RAM)
 try:
@@ -25,13 +24,13 @@ def get_query_embedding(query):
     """Get query embedding from Gemini API with retry logic."""
     for attempt in range(3):
         try:
-            result = client.models.embed_content(
+            result = genai.embed_content(
                 model="models/text-embedding-004",
                 content=query
             )
             # Extract embedding values
             if hasattr(result, 'embedding'):
-                return result.embedding.values
+                return result['embedding']
             return result['embedding']
         except Exception as e:
             if attempt < 2:
