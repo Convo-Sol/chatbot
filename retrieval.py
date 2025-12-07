@@ -4,11 +4,12 @@ import faiss
 import numpy as np
 import pickle
 import time
-from google import genai
-from config import TOP_K
+import google.generativeai as genai
+from config import TOP_K, GEMINI_API_KEY
 
-# Initialize Google GenAI client
-client = genai.Client()
+# Configure and initialize Google GenAI client
+genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Load Faiss index (memory-mapped to avoid loading all data into RAM)
 try:

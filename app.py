@@ -1,15 +1,17 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from retrieval import retrieve_top_k
-from google import genai
+import google.generativeai as genai
+from config import GEMINI_API_KEY
 import os
 import time
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS on all routes:contentReference[oaicite:16]{index=16}
+CORS(app)  # Enable CORS on all routes
 
-# Initialize Google GenAI client for Gemini
-client = genai.Client()
+# Configure and initialize Google GenAI client for Gemini
+genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -20,7 +22,8 @@ def chat():
 
     # Retrieve top relevant chunks for the question
     relevant_chunks = retrieve_top_k(question, top_k=3)
-    context = "\n".join(relevant_chunks)
+    # Extract text from chunks (retrieve_top_k returns list of (score, chunk_dict))
+    context = "\n".join([chunk['text'] for score, chunk in relevant_chunks])
 
     # Build a prompt with context and question (with guardrail for accuracy)
     prompt = (
