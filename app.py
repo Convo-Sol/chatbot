@@ -9,9 +9,8 @@ import time
 app = Flask(__name__)
 CORS(app)  # Enable CORS on all routes
 
-# Configure and initialize Google GenAI client for Gemini
+# Configure Google GenAI for Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-client = genai.Client(api_key=GEMINI_API_KEY)
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -32,16 +31,14 @@ def chat():
         f"Context:\\n{context}\\n\\nQuestion: {question}\\nAnswer:"
     )
 
-    # Call Gemini text-generation API to get the answer:contentReference[oaicite:17]{index=17}
+    # Call Gemini text-generation API to get the answer
     answer_text = None
     for attempt in range(3):
         try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",  # or another available Gemini model
-                contents=prompt
-            )
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            response = model.generate_content(prompt)
             # GenAI SDK returns .text
-            answer_text = getattr(response, 'text', '') or getattr(response, 'text', '')
+            answer_text = response.text
             break
         except Exception:
             if attempt < 2:
