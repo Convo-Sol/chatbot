@@ -1,24 +1,16 @@
 # retrieval.py - Query Embedding & Search
-# Uses Faiss index (memory-mapped) and Gemini API for query embeddings
-import faiss
-import numpy as np
-import pickle
+# Uses ChromaDB and Gemini API for query embeddings
 import time
 import google.generativeai as genai
+import chromadb
 from config import TOP_K, GEMINI_API_KEY
 
 # Configure Google GenAI
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Load Faiss index (memory-mapped to avoid loading all data into RAM)
-try:
-    index = faiss.read_index('db/index.faiss', faiss.IO_FLAG_MMAP)
-except Exception:
-    index = faiss.read_index('db/index.faiss')
-
-# Load chunk metadata
-with open('db/chunks.pkl', 'rb') as f:
-    chunks = pickle.load(f)
+# Initialize ChromaDB client
+client = chromadb.PersistentClient(path="db")
+collection = client.get_collection(name="documents")
 
 def get_query_embedding(query):
     """Get query embedding from Gemini API with retry logic."""
@@ -39,23 +31,28 @@ def get_query_embedding(query):
                 raise RuntimeError(f"Embedding API failed: {e}")
 
 def retrieve_top_k(query, top_k=TOP_K):
-    """Get the query embedding using Gemini and retrieve top-k chunks relevant to the query using Faiss search."""
+    """Get the query embedding using Gemini and retrieve top-k chunks relevant to the query using ChromaDB."""
     # Get query embedding from Gemini
     embedding = get_query_embedding(query)
     
-    # Prepare query vector and normalize for inner-product search
-    query_vec = np.array(embedding, dtype=np.float32)
-    norm = np.linalg.norm(query_vec)
-    if norm > 0:
-        query_vec = query_vec / norm
+    # Query ChromaDB
+    results = collection.query(
+        query_embeddings=[embedding],
+        n_results=top_k
+    )
     
-    # Search in Faiss index
-    D, I = index.search(np.expand_dims(query_vec, axis=0), top_k)
+    # Format results to match original return format
+    formatted_results = []
+    if results['documents'] and len(results['documents']) > 0:
+        for i in range(len(results['documents'][0])):
+            distance = results['distances'][0][i] if results['distances'] else 0
+            # Convert distance to similarity score (ChromaDB returns distances, lower is better)
+            score = 1 - distance
+            chunk = {
+                'text': results['documents'][0][i],
+                'filename': results['metadatas'][0][i].get('filename', ''),
+                'chunk_index': results['metadatas'][0][i].get('chunk_index', 0)
+            }
+            formatted_results.append((float(score), chunk))
     
-    # Return top chunks with scores
-    results = []
-    for score, idx in zip(D[0], I[0]):
-        if idx != -1 and idx < len(chunks):
-            results.append((float(score), chunks[idx]))
-    
-    return results
+    return formatted_results

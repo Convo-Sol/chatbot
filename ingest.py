@@ -1,16 +1,14 @@
 # ingest.py - Offline Ingestion
-# Run this locally to build the Faiss index. DO NOT run on Render.
+# Run this locally to build the ChromaDB collection.
 import sys
 import os
 from sentence_transformers import SentenceTransformer
-import numpy as np
-import faiss
-import pickle
+import chromadb
 from utils import read_text_files, chunk_text
 from config import CHUNK_SIZE, CHUNK_OVERLAP
 
 def build_db():
-    """Build Faiss index offline with local sentence-transformers model."""
+    """Build ChromaDB collection with local sentence-transformers model."""
     # Read and chunk documents
     files = read_text_files("data")
     chunks = []
@@ -29,31 +27,42 @@ def build_db():
     
     print(f"Processing {len(chunks)} chunks...")
     
-    # Load embedding model offline
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    # Initialize ChromaDB client
+    client = chromadb.PersistentClient(path="db")
     
-    # Extract text for embedding
-    chunk_texts = [c["text"] for c in chunks]
+    # Delete existing collection if it exists
+    try:
+        client.delete_collection(name="documents")
+    except:
+        pass
     
-    # Generate embeddings
+    # Create collection with sentence-transformers embedding function
+    collection = client.create_collection(
+        name="documents",
+        metadata={"hnsw:space": "cosine"}
+    )
+    
+    # Prepare data for ChromaDB
+    ids = [f"chunk_{i}" for i in range(len(chunks))]
+    documents = [c["text"] for c in chunks]
+    metadatas = [{"filename": c["filename"], "chunk_index": c["chunk_index"]} for c in chunks]
+    
+    # Load embedding model and generate embeddings
     print("Generating embeddings...")
-    embeddings = model.encode(chunk_texts, convert_to_tensor=False, normalize_embeddings=True, show_progress_bar=True)
-    embeddings = np.array(embeddings, dtype=np.float32)  # Use float32 to save memory
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    embeddings = model.encode(documents, convert_to_tensor=False, normalize_embeddings=True, show_progress_bar=True)
+    embeddings = embeddings.tolist()
     
-    # Build Faiss index (Inner-Product for cosine similarity)
-    dim = embeddings.shape[1]
-    index = faiss.IndexFlatIP(dim)
-    index.add(embeddings)
+    # Add to collection
+    collection.add(
+        ids=ids,
+        documents=documents,
+        metadatas=metadatas,
+        embeddings=embeddings
+    )
     
-    # Save index and metadata
-    os.makedirs('db', exist_ok=True)
-    faiss.write_index(index, 'db/index.faiss')
-    
-    with open('db/chunks.pkl', 'wb') as f:
-        pickle.dump(chunks, f)
-    
-    print(f"Ingestion complete. Saved db/index.faiss and db/chunks.pkl")
-    print(f"Total chunks: {len(chunks)}, Embedding dimension: {dim}")
+    print(f"Ingestion complete. ChromaDB collection saved in db/")
+    print(f"Total chunks: {len(chunks)}")
 
 if __name__ == "__main__":
     build_db()
