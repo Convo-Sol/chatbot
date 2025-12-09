@@ -8,9 +8,21 @@ from config import TOP_K, GEMINI_API_KEY
 # Configure Google GenAI
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Initialize ChromaDB client
-client = chromadb.PersistentClient(path="db")
-collection = client.get_collection(name="documents")
+# Lazy-loaded ChromaDB client and collection
+_client = None
+_collection = None
+
+def _get_collection():
+    """Lazy load ChromaDB collection to avoid blocking startup."""
+    global _client, _collection
+    if _client is None:
+        _client = chromadb.PersistentClient(path="db")
+    if _collection is None:
+        try:
+            _collection = _client.get_collection(name="documents")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load ChromaDB collection: {e}")
+    return _collection
 
 def get_query_embedding(query):
     """Get query embedding from Gemini API with retry logic."""
@@ -34,8 +46,9 @@ def retrieve_top_k(query, top_k=TOP_K):
     """Get the query embedding using Gemini and retrieve top-k chunks relevant to the query using ChromaDB."""
     # Get query embedding from Gemini
     embedding = get_query_embedding(query)
-    
+
     # Query ChromaDB
+    collection = _get_collection()
     results = collection.query(
         query_embeddings=[embedding],
         n_results=top_k
