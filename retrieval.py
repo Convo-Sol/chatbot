@@ -1,12 +1,8 @@
 # retrieval.py - Query Embedding & Search
-# Uses ChromaDB and Gemini API for query embeddings
-import time
-import google.generativeai as genai
+# Uses ChromaDB and local sentence-transformers for query embeddings (consistent with ingest.py)
 import chromadb
-from config import TOP_K, GEMINI_API_KEY
-
-# Configure Google GenAI
-genai.configure(api_key=GEMINI_API_KEY)
+from embeddings import get_embedding
+from config import TOP_K
 
 # Lazy-loaded ChromaDB client and collection
 _client = None
@@ -24,28 +20,10 @@ def _get_collection():
             raise RuntimeError(f"Failed to load ChromaDB collection: {e}")
     return _collection
 
-def get_query_embedding(query):
-    """Get query embedding from Gemini API with retry logic."""
-    for attempt in range(3):
-        try:
-            result = genai.embed_content(
-                model="models/text-embedding-004",
-                content=query
-            )
-            # Extract embedding values
-            if hasattr(result, 'embedding'):
-                return result['embedding']
-            return result['embedding']
-        except Exception as e:
-            if attempt < 2:
-                time.sleep(1)
-            else:
-                raise RuntimeError(f"Embedding API failed: {e}")
-
 def retrieve_top_k(query, top_k=TOP_K):
-    """Get the query embedding using Gemini and retrieve top-k chunks relevant to the query using ChromaDB."""
-    # Get query embedding from Gemini
-    embedding = get_query_embedding(query)
+    """Get the query embedding using local model and retrieve top-k chunks relevant to the query using ChromaDB."""
+    # Get query embedding from local model
+    embedding = get_embedding(query, task_type="retrieval_query")
 
     # Query ChromaDB
     collection = _get_collection()
@@ -53,7 +31,7 @@ def retrieve_top_k(query, top_k=TOP_K):
         query_embeddings=[embedding],
         n_results=top_k
     )
-    
+
     # Format results to match original return format
     formatted_results = []
     if results['documents'] and len(results['documents']) > 0:
@@ -67,5 +45,5 @@ def retrieve_top_k(query, top_k=TOP_K):
                 'chunk_index': results['metadatas'][0][i].get('chunk_index', 0)
             }
             formatted_results.append((float(score), chunk))
-    
+
     return formatted_results
