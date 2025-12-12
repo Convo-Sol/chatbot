@@ -36,8 +36,8 @@ Thumbs.db
 # Logs
 *.log
 
-# Database
-db/
+# Database (comment out for deployment - we need the db files)
+# db/
 
 # Temporary files
 *.tmp
